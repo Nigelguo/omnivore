@@ -1,16 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialise Supabase client with service role key
 const supabase = createClient(
-  process.env.SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST'])
-    return res.status(405).end(`Method ${req.method} Not Allowed`)
+    return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
   const { email, password, fullName, username } = req.body
@@ -19,36 +17,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Missing required fields' })
   }
 
-  try {
-    // Check if username already exists
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .maybeSingle()
+  // Check if username already exists
+  const { data: existingUser, error: findError } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('username', username)
+    .single()
 
-    if (checkError) throw checkError
-    if (existingUser) {
-      return res.status(409).json({ error: 'Username already taken' })
-    }
+  if (existingUser) {
+    return res.status(409).json({ error: 'Username already taken' })
+  }
 
-    // Create user with email/password
-    const { data, error } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      user_metadata: {
-        fullName,
+  // Sign up user
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
         username
       }
-    })
-
-    if (error) {
-      return res.status(400).json({ error: error.message })
     }
+  })
 
-    return res.status(200).json({ message: 'User created', user: data.user })
-  } catch (err: any) {
-    console.error('Signup error:', err)
-    return res.status(500).json({ error: err.message || 'Internal server error' })
+  if (signUpError) {
+    return res.status(500).json({ error: signUpError.message })
   }
+
+  return res.status(200).json({ message: 'Signup successful', user: signUpData.user })
 }
