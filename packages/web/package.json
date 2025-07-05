@@ -19,6 +19,7 @@
     "@floating-ui/react": "^0.26.9",
     "jsonwebtoken": "^9.0.2",
     "@google-recaptcha/react": "^1.0.3",
+    "@supabase/supabase-js": "^2.39.5",
     "@phosphor-icons/react": "^2.1.5",
     "@radix-ui/react-avatar": "^0.1.1",
     "@radix-ui/react-checkbox": "^0.1.5",
