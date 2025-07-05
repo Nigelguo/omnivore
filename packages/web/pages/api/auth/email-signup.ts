@@ -1,92 +1,48 @@
-import { useState } from 'react'
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
 
-export default function EmailSignup() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [username, setUsername] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    if (username.length < 4) {
-      setError('Username must be at least 4 characters')
-      return
-    }
-
-    const res = await fetch('/api/auth/email-signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, password, fullName, username })
-    })
-
-    const data = await res.json()
-
-    if (!res.ok) {
-      setError(data.error || 'Something went wrong')
-      setSuccess('')
-    } else {
-      setSuccess('Signup successful! Please check your email.')
-      setError('')
-      setEmail('')
-      setPassword('')
-      setFullName('')
-      setUsername('')
-    }
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' })
   }
 
-  return (
-    <div style={{ maxWidth: 400, margin: '40px auto', fontFamily: 'sans-serif' }}>
-      <h2>Sign Up</h2>
-      <form onSubmit={handleSubmit}>
-        <label>Full Name</label>
-        <input
-          type="text"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-          style={{ display: 'block', marginBottom: 10, width: '100%' }}
-        />
+  const { email, password, fullName, username } = req.body
 
-        <label>Username</label>
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-          style={{ display: 'block', marginBottom: 10, width: '100%' }}
-        />
-        {username && username.length < 4 && (
-          <p style={{ color: 'red' }}>Username should contain at least four characters</p>
-        )}
+  if (!email || !password || !fullName || !username) {
+    return res.status(400).json({ error: 'Missing required fields' })
+  }
 
-        <label>Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{ display: 'block', marginBottom: 10, width: '100%' }}
-        />
+  // Check if username already exists
+  const { data: existingUser, error: findError } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('username', username)
+    .single()
 
-        <label>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{ display: 'block', marginBottom: 20, width: '100%' }}
-        />
+  if (existingUser) {
+    return res.status(409).json({ error: 'Username already taken' })
+  }
 
-        <button type="submit" style={{ width: '100%' }}>Sign Up</button>
-      </form>
+  // Sign up user
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+        username
+      }
+    }
+  })
 
-      {error && <p style={{ color: 'red', marginTop: 20 }}>{error}</p>}
-      {success && <p style={{ color: 'green', marginTop: 20 }}>{success}</p>}
-    </div>
-  )
+  if (signUpError) {
+    return res.status(500).json({ error: signUpError.message })
+  }
+
+  return res.status(200).json({ message: 'Signup successful', user: signUpData.user })
 }
