@@ -1,5 +1,5 @@
 {
-  "regions": ["sfo"],
+  "regions": ["sfo1"],
   "headers": [
     {
       "source": "/static/fonts/(.*)",
